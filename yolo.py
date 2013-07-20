@@ -44,4 +44,6 @@ del train[25]
 train.to_csv('./train.csv', header=False, index=False)
 test.to_csv('./test.csv', header=False, index=False)
 
-# delete rows based on visualizations
+# delete features and outliers based on visualizations
+train_plucked = train.drop([2182,3460,4057,4080])
+train_plucked.to_csv('./train-plucked.csv', header=False, index=False)
