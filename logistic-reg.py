@@ -106,34 +106,30 @@ def main():
 #    y, X = load_data(args['train'])
     train = pd.read_csv('./train-plucked.csv') # pull version with outliers removed
     test = pd.read_csv('./test.csv')
-    target = train.ix[:, -1]
-    trainfeatures = train.ix[:, 1:-1]
-    testfeatures = train.ix[:, 1:-1]
- # last column in array is target data
-    X = trainfeatures # all cols through 23 are ids or features
-
-    all_data = np.vstack((trainfeatures, testfeatures))
-    num_train = np.shape(trainfeatures)[0] #this is the number of rows in training data
+    y = train.ix[:,24] # last column in array is target data
+    X = train.ix[:,1:24] # all cols through 23 are ids or features
+    test = test.ix[:,1:24]
+    all_data = np.vstack((X, test))
+    num_train = np.shape(X)[0] #this is the number of rows in training data
     
     print ('setting the logistic model')
     model = linear_model.LogisticRegression() # no need to use C as data has been scaled
     
     print ('transforming data')
     #groups with additional features
-    dp = group_data(all_data, degree=2) 
-#    dt = group_data(all_data, degree=3)
+#    dp = group_data(all_data, degree=1)
+#    dt = group_data(all_data, degree=1)
     
-    #split additional features between train and test sets  
-    y = trainfeatures
-    X = all_data[:num_train]    
-    X_2 = dp[:num_train]
+    #split additional features between train and test sets
+    X = all_data[:num_train]
+#    X_2 = dp[:num_train]
 #    X_3 = dt[:num_train]
     X_test = all_data[num_train:]
-    X_test_2 = dp[num_train:]
+#    X_test_2 = dp[num_train:]
 #    X_test_3 = dt[num_train:]
 
-    X_test_all = np.hstack((X_test, X_test_2))
-    X_train_all = np.hstack((X, X_2))
+    X_test_all = X_test
+    X_train_all = X
     num_features = X_train_all.shape[1]
     
     # Xts holds one hot encodings for each individual feature in memory
@@ -188,7 +184,7 @@ def main():
         
     print ('making predictions and saving data')
     predictions = model.predict_proba(X)[:,1]
-    save_results(predictions, args['submit'])
+    save_results(predictions, "./linregpred.csv")
 
 # This is where everything starts    
 if __name__ == '__main__':
