@@ -29,4 +29,12 @@ for col in range(10,24):
 train[1] = train[1].map(lambda val: 0 if val == -1 else 1)
 test[1] = test[1].map(lambda val: 0 if val == -1 else 1)
 # find max and divide each number by max
-
+for col in range(2,25):
+    max = train[col].max()
+    if max != 0: train[col] = train[col].map(lambda val: val / max)
+for col in range(2,24):
+    max = test[col].max()
+    if max != 0: test[col] = test[col].map(lambda val: val / max)
+# output csv files
+train.to_csv('./training.csv')
+test.to_csv('./test.csv')
