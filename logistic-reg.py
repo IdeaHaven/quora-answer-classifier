@@ -65,7 +65,8 @@ def cv_loop(X, y, model, N):
         X_train, X_cv, y_train, y_cv = cross_validation.train_test_split(
                                        X, y, test_size=.20, 
                                        random_state = i*SEED)
-        model.fit_transform(X_train, y_train)
+        model.fit(X_train, y_train)
+#        model.fit_transform(X_train, y_train)
         preds = model.predict_proba(X_cv)[:,1]
         auc = metrics.auc_score(y_cv, preds)
         print "AUC (fold %d/%d): %f" % (i + 1, N, auc)
@@ -105,11 +106,14 @@ def main():
 #    y, X = load_data(args['train'])
     train = pd.read_csv('./train-plucked.csv') # pull version with outliers removed
     test = pd.read_csv('./test.csv')
-    y = train.ix[:,24] # last column in array is target data
-    X = train.ix[:,:24] # all cols through 23 are ids or features
+    target = train.ix[:, -1]
+    trainfeatures = train.ix[:, 1:-1]
+    testfeatures = train.ix[:, 1:-1]
+ # last column in array is target data
+    X = trainfeatures # all cols through 23 are ids or features
 
-    all_data = np.vstack((X, test))
-    num_train = np.shape(X)[0] #this is the number of rows in training data
+    all_data = np.vstack((trainfeatures, testfeatures))
+    num_train = np.shape(trainfeatures)[0] #this is the number of rows in training data
     
     print ('setting the logistic model')
     model = linear_model.LogisticRegression() # no need to use C as data has been scaled
@@ -117,23 +121,25 @@ def main():
     print ('transforming data')
     #groups with additional features
     dp = group_data(all_data, degree=2) 
-    dt = group_data(all_data, degree=3)
+#    dt = group_data(all_data, degree=3)
     
     #split additional features between train and test sets  
+    y = trainfeatures
     X = all_data[:num_train]    
     X_2 = dp[:num_train]
-    X_3 = dt[:num_train]
+#    X_3 = dt[:num_train]
     X_test = all_data[num_train:]
     X_test_2 = dp[num_train:]
-    X_test_3 = dt[num_train:]
+#    X_test_3 = dt[num_train:]
 
-    X_test_all = np.hstack((X_test, X_test_2, X_test_3))
-    X_train_all = np.hstack((X, X_2, X_3))
+    X_test_all = np.hstack((X_test, X_test_2))
+    X_train_all = np.hstack((X, X_2))
     num_features = X_train_all.shape[1]
     
     # Xts holds one hot encodings for each individual feature in memory
     # speeding up feature selection 
-    Xts = [OneHotEncoder(X_train_all[:,[i]])[0] for i in range(num_features)]
+#    Xts = [OneHotEncoder(X_train_all[:,[i]])[0] for i in range(num_features)]
+    Xts = X_train_all
     
     print ('performing greedy feature selection')
     score_hist = []
@@ -143,14 +149,16 @@ def main():
     while len(score_hist) < 2 or score_hist[-1][0] > score_hist[-2][0]:
         scores = []
 # fix this!
-        for f in range(len(Xts)): #X.columns: this will need to be larger because of the hstack of features
+        for f in range(Xts.shape[1]): #X.columns: this will need to be larger because of the hstack of features
+#        for f in range(len(Xts)): #X.columns: this will need to be larger because of the hstack of features
+            print f           
             if f not in good_features:
                 feats = list(good_features) + [f]
                 # the fundamental difference between this and last night's code is that the data set is NOT sparse, which means model.fit does not work and sparse.hstack/tocsr() is useless. I suspect this to be a major reason for problems
                 #Xt = sparse.hstack([X[j] for j in feats]).tocsr()
                 #Xt = np.hstack(X[j] for j in feats)
-                Xt = sparse.hstack([Xts[j] for j in feats]).tocsr()                
-                score = cv_loop(Xt, y, model, N) # this x is always the same
+#                Xt = sparse.hstack([Xts[j] for j in feats]).tocsr()                
+                score = cv_loop(Xts, y, model, N) # this x is always the same
                 scores.append((score, f))
                 print "Feature: %i Mean AUC: %f" % (f, score)
         good_features.add(sorted(scores)[-1][1])
