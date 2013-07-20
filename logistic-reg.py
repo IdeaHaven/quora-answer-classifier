@@ -8,9 +8,6 @@ from scipy import sparse
 from itertools import combinations
 
 
-
-SEED = 25
-
 # === THIS WORKS GREAT === #
 #def load_data(filename):
 #    train = pd.read_csv(filename, sep="\s", skiprows=1, names=range(25), nrows=4499)
@@ -60,6 +57,8 @@ def save_results(predictions, filename):
 # AUC (fold 10/10): 0.496158
 # C: 10.767202 Mean AUC: 0.513133
 
+SEED = 25
+
 def cv_loop(X, y, model, N):
     mean_auc = 0.
     for i in range(N):
@@ -72,6 +71,34 @@ def cv_loop(X, y, model, N):
         print "AUC (fold %d/%d): %f" % (i + 1, N, auc)
         mean_auc += auc
     return mean_auc/N
+
+def OneHotEncoder(data, keymap=None):
+     """
+     OneHotEncoder takes data matrix with categorical columns and
+     converts it to a sparse binary matrix.
+     
+     Returns sparse binary matrix and keymap mapping categories to indices.
+     If a keymap is supplied on input it will be used instead of creating one
+     and any categories appearing in the data that are not in the keymap are
+     ignored
+     """
+     if keymap is None:
+          keymap = []
+          for col in data.T:
+               uniques = set(list(col))
+               keymap.append(dict((key, i) for i, key in enumerate(uniques)))
+     total_pts = data.shape[0]
+     outdat = []
+     for i, col in enumerate(data.T):
+          km = keymap[i]
+          num_labels = len(km)
+          spmat = sparse.lil_matrix((total_pts, num_labels))
+          for j, val in enumerate(col):
+               if val in km:
+                    spmat[j, km[val]] = 1
+          outdat.append(spmat)
+     outdat = sparse.hstack(outdat).tocsr()
+     return outdat, keymap
 
 def main():
     print ('loading the data')
@@ -103,23 +130,26 @@ def main():
     X_train_all = np.hstack((X, X_2, X_3))
     num_features = X_train_all.shape[1]
     
-    # this is where we put onehotencoding if we plan to use it
+    # Xts holds one hot encodings for each individual feature in memory
+    # speeding up feature selection 
+    Xts = [OneHotEncoder(X_train_all[:,[i]])[0] for i in range(num_features)]
     
     print ('performing greedy feature selection')
     score_hist = []
     N = 10 # number of cv_loop iterations
     good_features = set([])
     # Greedy feature selection loop
-    while len(score_hist) < 3 or score_hist[-1][0] > score_hist[-2][0]:
+    while len(score_hist) < 2 or score_hist[-1][0] > score_hist[-2][0]:
         scores = []
 # fix this!
-        for f in range(1,23): #X.columns: this will need to be larger because of the hstack of features
+        for f in range(len(Xts)): #X.columns: this will need to be larger because of the hstack of features
             if f not in good_features:
                 feats = list(good_features) + [f]
                 # the fundamental difference between this and last night's code is that the data set is NOT sparse, which means model.fit does not work and sparse.hstack/tocsr() is useless. I suspect this to be a major reason for problems
                 #Xt = sparse.hstack([X[j] for j in feats]).tocsr()
                 #Xt = np.hstack(X[j] for j in feats)
-                score = cv_loop(X, y, model, N) # this x is always the same
+                Xt = sparse.hstack([Xts[j] for j in feats]).tocsr()                
+                score = cv_loop(Xt, y, model, N) # this x is always the same
                 scores.append((score, f))
                 print "Feature: %i Mean AUC: %f" % (f, score)
         good_features.add(sorted(scores)[-1][1])
