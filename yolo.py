@@ -35,6 +35,13 @@ for col in range(2,25):
 for col in range(2,24):
     max = test[col].max()
     if max != 0: test[col] = test[col].map(lambda val: val / max)
+# move target column to end (only in train)
+train[25] = train[1]
+for col in range(2,26):
+    train[col-1] = train[col]
+del train[25]
 # output csv files
-train.to_csv('./training.csv')
-test.to_csv('./test.csv')
+train.to_csv('./train.csv', header=False, index=False)
+test.to_csv('./test.csv', header=False, index=False)
+
+# delete rows based on visualizations
