@@ -1,28 +1,10 @@
 import numpy as np
 import pandas as pd
-import sklearn
 
-from numpy import array, hstack
+from numpy import array
 from sklearn import metrics, cross_validation, linear_model
-from scipy import sparse
 from itertools import combinations
-
-
-# === THIS WORKS GREAT === #
-#def load_data(filename):
-#    train = pd.read_csv(filename, sep="\s", skiprows=1, names=range(25), nrows=4499)
-#    test = pd.read_csv(filename, sep="\s", skiprows=4500, names=range(25))
-#    print ('munging the data')    
-#    for i in range(2,11):
-#        train[i] = train[i].map(lambda i: float(str(i)[2:]))
-#    for j in range(11,25):
-#        train[j] = train[j].map(lambda i: float(str(i)[3:]))       
-#    labels = train[1]
-#    # data should really be [:,[0,2,3....]], but [0] is ugly
-#    data = train.loc[:,[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]]    
-#    return labels, data # labels = y, data = X
-
-# === SUPER BROKEN === #    
+  
 def group_data(data, degree=3):
     new_data = []
     m,n = data.shape
@@ -30,8 +12,7 @@ def group_data(data, degree=3):
     for indices in combinations(range(n), degree):
         new_data.append([hash(tuple(v)) for v in data[:,indices]])
     return array(new_data).T
-    
-# === THIS WORKS FINE === #    
+       
 def save_results(predictions, filename):
     content = ['id,ACTION']
     for i, p in enumerate(predictions):
@@ -40,22 +21,6 @@ def save_results(predictions, filename):
     f.write('\n'.join(content))
     f.close()
     print ('data saved')
-
-
-# === Something is causing each iteration to return identical results to the previous, but I suspect cv_loop itself to be functioning fine === #
-
-# Output:
-# AUC (fold 1/10): 0.526255
-# AUC (fold 2/10): 0.533174
-# AUC (fold 3/10): 0.538685
-# AUC (fold 4/10): 0.513203
-# AUC (fold 5/10): 0.520270
-# AUC (fold 6/10): 0.566535
-# AUC (fold 7/10): 0.535882
-# AUC (fold 8/10): 0.446576
-# AUC (fold 9/10): 0.454598
-# AUC (fold 10/10): 0.496158
-# C: 10.767202 Mean AUC: 0.513133
 
 SEED = 25
 
@@ -66,44 +31,14 @@ def cv_loop(X, y, model, N):
                                        X, y, test_size=.20, 
                                        random_state = i*SEED)
         model.fit(X_train, y_train)
-#        model.fit_transform(X_train, y_train)
         preds = model.predict_proba(X_cv)[:,1]
         auc = metrics.auc_score(y_cv, preds)
         print "AUC (fold %d/%d): %f" % (i + 1, N, auc)
         mean_auc += auc
     return mean_auc/N
 
-def OneHotEncoder(data, keymap=None):
-     """
-     OneHotEncoder takes data matrix with categorical columns and
-     converts it to a sparse binary matrix.
-     
-     Returns sparse binary matrix and keymap mapping categories to indices.
-     If a keymap is supplied on input it will be used instead of creating one
-     and any categories appearing in the data that are not in the keymap are
-     ignored
-     """
-     if keymap is None:
-          keymap = []
-          for col in data.T:
-               uniques = set(list(col))
-               keymap.append(dict((key, i) for i, key in enumerate(uniques)))
-     total_pts = data.shape[0]
-     outdat = []
-     for i, col in enumerate(data.T):
-          km = keymap[i]
-          num_labels = len(km)
-          spmat = sparse.lil_matrix((total_pts, num_labels))
-          for j, val in enumerate(col):
-               if val in km:
-                    spmat[j, km[val]] = 1
-          outdat.append(spmat)
-     outdat = sparse.hstack(outdat).tocsr()
-     return outdat, keymap
-
 def main():
     print ('loading the data')
-#    y, X = load_data(args['train'])
     train = pd.read_csv('./train-plucked.csv') # pull version with outliers removed
     test = pd.read_csv('./test.csv')
     y = train.ix[:,24] # last column in array is target data
@@ -130,13 +65,8 @@ def main():
 
     X_test_all = X_test
     X_train_all = X
-    num_features = X_train_all.shape[1]
-    
-    # Xts holds one hot encodings for each individual feature in memory
-    # speeding up feature selection 
-#    Xts = [OneHotEncoder(X_train_all[:,[i]])[0] for i in range(num_features)]
-    Xts = X_train_all
-    
+#    num_features = X_train_all.shape[1]
+
     print ('performing greedy feature selection')
     score_hist = []
     N = 10 # number of cv_loop iterations
@@ -144,17 +74,10 @@ def main():
     # Greedy feature selection loop
     while len(score_hist) < 2 or score_hist[-1][0] > score_hist[-2][0]:
         scores = []
-# fix this!
-        for f in range(Xts.shape[1]): #X.columns: this will need to be larger because of the hstack of features
-#        for f in range(len(Xts)): #X.columns: this will need to be larger because of the hstack of features
-            print f           
+        for f in range(X_train_all.shape[1]):
             if f not in good_features:
-                feats = list(good_features) + [f]
-                # the fundamental difference between this and last night's code is that the data set is NOT sparse, which means model.fit does not work and sparse.hstack/tocsr() is useless. I suspect this to be a major reason for problems
-                #Xt = sparse.hstack([X[j] for j in feats]).tocsr()
-                #Xt = np.hstack(X[j] for j in feats)
-#                Xt = sparse.hstack([Xts[j] for j in feats]).tocsr()                
-                score = cv_loop(Xts, y, model, N) # this x is always the same
+#                feats = list(good_features) + [f]              
+                score = cv_loop(X_train_all, y, model, N)
                 scores.append((score, f))
                 print "Feature: %i Mean AUC: %f" % (f, score)
         good_features.add(sorted(scores)[-1][1])
