@@ -120,9 +120,10 @@ def main():
     dt = group_data(all_data, degree=3)
     
     #split additional features between train and test sets  
+    X = all_data[:num_train]    
     X_2 = dp[:num_train]
     X_3 = dt[:num_train]
-    X_test = test
+    X_test = all_data[num_train:]
     X_test_2 = dp[num_train:]
     X_test_3 = dt[num_train:]
 
@@ -177,7 +178,7 @@ def main():
     print "Training full model..."
     model.fit(X, y)
         
-    print ('making predictions and saving data to ', args['submit'])
+    print ('making predictions and saving data')
     predictions = model.predict_proba(X)[:,1]
     save_results(predictions, args['submit'])
 
